@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import { View, ActivityIndicator } from 'react-native';
 import 'react-native-reanimated';
 import { isLoggedIn } from '@/lib/auth';
-import { cleanupExpiredTrainings } from '@/lib/api';
 import { Colors } from '@/constants/theme';
 
 export const unstable_settings = {
@@ -19,9 +18,6 @@ export default function RootLayout() {
 
   useEffect(() => {
     (async () => {
-      try {
-        await cleanupExpiredTrainings();
-      } catch {}
       const ok = await isLoggedIn();
       setAuthed(ok);
       setReady(true);
@@ -38,7 +34,6 @@ export default function RootLayout() {
     }
   }, [ready, authed, segments]);
 
-  // Re-check auth when navigating (after login)
   useEffect(() => {
     if (!ready) return;
     isLoggedIn().then(setAuthed);
@@ -46,7 +41,14 @@ export default function RootLayout() {
 
   if (!ready) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: Colors.light.header }}>
+      <View
+        style={{
+          flex: 1,
+          alignItems: 'center',
+          justifyContent: 'center',
+          backgroundColor: Colors.light.header,
+        }}
+      >
         <ActivityIndicator color="#fff" size="large" />
       </View>
     );
@@ -57,21 +59,35 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerShown: false }}>
         <Stack.Screen name="login" />
         <Stack.Screen name="(tabs)" />
-        <Stack.Screen name="membre/[id]" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="ajouter-membre" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
-        <Stack.Screen name="modifier-membre/[id]" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="entrainement/[id]" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="ajouter-entrainement" options={{ animation: 'slide_from_bottom', presentation: 'modal' }} />
-        <Stack.Screen name="modifier-entrainement/[id]" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="qr-coach" options={{ animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="presence-list" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="ecolage/[id]" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="stats-joueur/[id]" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="profil-equipe" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="bajaj/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen
+          name="ajouter-bajaj"
+          options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+        />
+        <Stack.Screen name="modifier-bajaj/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="chauffeur/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen
+          name="ajouter-chauffeur"
+          options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+        />
+        <Stack.Screen
+          name="modifier-chauffeur/[id]"
+          options={{ animation: 'slide_from_right' }}
+        />
+        <Stack.Screen
+          name="ajouter-versement"
+          options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+        />
+        <Stack.Screen name="versement/[id]" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen
+          name="ajouter-frais"
+          options={{ animation: 'slide_from_bottom', presentation: 'modal' }}
+        />
+        <Stack.Screen name="frais/[id]" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="notifications" options={{ animation: 'slide_from_right' }} />
-        <Stack.Screen name="scanner" options={{ animation: 'slide_from_bottom' }} />
-        <Stack.Screen name="confirmation-presence" options={{ animation: 'fade' }} />
         <Stack.Screen name="historique" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="gps" options={{ animation: 'slide_from_right' }} />
+        <Stack.Screen name="stats" options={{ animation: 'slide_from_right' }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>
       <StatusBar style="light" />

@@ -1,33 +1,37 @@
 {
   "expo": {
-    "name": "HMVB",
-    "slug": "hmvb",
+    "name": "Bajaj Manager",
+    "slug": "bajaj-manager",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "hmvb",
+    "scheme": "bajaj",
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
       "infoPlist": {
-        "NSCameraUsageDescription": "HMVB a besoin de la cam\u00e9ra pour scanner les QR codes des joueurs et prendre des photos d'avatar.",
-        "NSPhotoLibraryUsageDescription": "HMVB a besoin d'acc\u00e9der \u00e0 vos photos pour l'avatar des joueurs."
+        "NSCameraUsageDescription": "Bajaj Manager a besoin de la cam\u00e9ra pour prendre des photos de chauffeurs et de factures.",
+        "NSPhotoLibraryUsageDescription": "Bajaj Manager a besoin d'acc\u00e9der \u00e0 vos photos pour les chauffeurs et factures.",
+        "NSLocationWhenInUseUsageDescription": "Bajaj Manager utilise votre position pour le suivi GPS des Bajaj.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Bajaj Manager utilise votre position pour le suivi GPS des Bajaj."
       },
-      "bundleIdentifier": "com.hmvb.app"
+      "bundleIdentifier": "com.bajaj.manager"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/android-icon-foreground.png",
-        "backgroundColor": "#0A2540"
+        "backgroundColor": "#1A1A1A"
       },
       "predictiveBackGestureEnabled": false,
       "permissions": [
-        "CAMERA",
-        "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE",
-        "READ_MEDIA_IMAGES"
+        "android.permission.CAMERA",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.READ_MEDIA_IMAGES",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION"
       ],
-      "package": "com.hmvb.app"
+      "package": "com.bajaj.manager"
     },
     "web": {
       "output": "static",
@@ -41,7 +45,7 @@
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 200,
           "resizeMode": "contain",
-          "backgroundColor": "#0A2540"
+          "backgroundColor": "#1A1A1A"
         }
       ],
       "expo-font",
@@ -49,23 +53,30 @@
       "expo-status-bar",
       "expo-web-browser",
       [
-        "expo-camera",
-        {
-          "cameraPermission": "VolleyTeam a besoin de la cam\u00e9ra pour scanner les QR codes de pr\u00e9sence."
-        }
-      ],
-      [
         "expo-image-picker",
         {
-          "photosPermission": "VolleyTeam a besoin d'acc\u00e9der \u00e0 vos photos pour l'avatar des joueurs.",
-          "cameraPermission": "VolleyTeam a besoin de la cam\u00e9ra pour prendre une photo d'avatar."
+          "photosPermission": "Bajaj Manager a besoin d'acc\u00e9der \u00e0 vos photos.",
+          "cameraPermission": "Bajaj Manager a besoin de la cam\u00e9ra."
         }
       ],
-      "expo-sqlite"
+      "expo-sqlite",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Bajaj Manager utilise votre position pour enregistrer la localisation des Bajaj.",
+          "locationWhenInUsePermission": "Bajaj Manager utilise votre position pour enregistrer la localisation des Bajaj."
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "aa11c744-328f-4177-a9fd-3d45ce865f01"
+      }
     }
   }
 }

@@ -1,14 +1,14 @@
 /**
- * Authentification coach (utilisateur unique)
+ * Authentification propriétaire (utilisateur unique)
  * Session stockée en SQLite — pas besoin d'AsyncStorage
  */
 import { getDb, generateId, nowIso } from './database';
 
-/** Identifiants coach (fixes) */
-export const COACH_CREDENTIALS = {
-  phone: '0347180709',
-  password: 'Dera301',
-  name: 'Coach',
+/** Identifiants propriétaire (à changer selon besoin) */
+export const OWNER_CREDENTIALS = {
+  phone: '0340000000',
+  password: 'bajaj2026',
+  name: 'Propriétaire',
 };
 
 async function ensureSessionTable() {
@@ -26,7 +26,7 @@ async function ensureSessionTable() {
 export async function login(phone: string, password: string): Promise<boolean> {
   const p = phone.replace(/\s+/g, '').trim();
   const pwd = password.trim();
-  if (p !== COACH_CREDENTIALS.phone || pwd !== COACH_CREDENTIALS.password) {
+  if (p !== OWNER_CREDENTIALS.phone || pwd !== OWNER_CREDENTIALS.password) {
     return false;
   }
   await ensureSessionTable();
@@ -34,7 +34,7 @@ export async function login(phone: string, password: string): Promise<boolean> {
   await db.runAsync('DELETE FROM session');
   await db.runAsync(
     'INSERT INTO session (id, phone, name, logged_in_at) VALUES (?, ?, ?, ?)',
-    [generateId(), p, COACH_CREDENTIALS.name, nowIso()]
+    [generateId(), p, OWNER_CREDENTIALS.name, nowIso()]
   );
   return true;
 }

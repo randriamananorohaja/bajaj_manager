@@ -1,50 +1,55 @@
 /**
- * VolleyTeam Design System
- * Colors extracted from the UX mockups
+ * Bajaj Manager — Design System Premium
+ * Couleurs inspirées des tuk-tuk jaunes de Mahajanga
  */
-
 import { Platform } from 'react-native';
 
 export const Colors = {
   light: {
-    text: '#1A1A2E',
-    textSecondary: '#6B7280',
-    textMuted: '#9CA3AF',
-    background: '#F0F4F8',
+    text: '#1A1A1A',
+    textSecondary: '#5C5C5C',
+    textMuted: '#9A9A9A',
+    background: '#FFFBEB',
     card: '#FFFFFF',
-    border: '#E5E7EB',
-    tint: '#1E6FD9',
-    primary: '#1E6FD9',
-    primaryDark: '#0A2540',
-    header: '#0A2540',
-    success: '#22C55E',
-    warning: '#F59E0B',
-    danger: '#EF4444',
-    icon: '#6B7280',
-    tabIconDefault: '#9CA3AF',
-    tabIconSelected: '#1E6FD9',
-    inputBg: '#F9FAFB',
-    progressBg: '#E5E7EB',
+    border: '#F5E6A3',
+    tint: '#F5C400',
+    primary: '#F5C400',
+    primaryDark: '#D4A800',
+    header: '#1A1A1A',
+    headerText: '#F5C400',
+    success: '#16A34A',
+    warning: '#EAB308',
+    danger: '#DC2626',
+    icon: '#5C5C5C',
+    tabIconDefault: '#9A9A9A',
+    tabIconSelected: '#D4A800',
+    inputBg: '#FFFDF5',
+    progressBg: '#F5E6A3',
+    accent: '#FFD54F',
+    surface: '#FFF8E1',
   },
   dark: {
-    text: '#F9FAFB',
-    textSecondary: '#D1D5DB',
-    textMuted: '#9CA3AF',
-    background: '#0F172A',
-    card: '#1E293B',
-    border: '#334155',
-    tint: '#3B82F6',
-    primary: '#3B82F6',
-    primaryDark: '#0A2540',
-    header: '#0A2540',
+    text: '#FAFAF9',
+    textSecondary: '#D6D3D1',
+    textMuted: '#A8A29E',
+    background: '#0C0A09',
+    card: '#1C1917',
+    border: '#44403C',
+    tint: '#F5C400',
+    primary: '#F5C400',
+    primaryDark: '#D4A800',
+    header: '#0C0A09',
+    headerText: '#F5C400',
     success: '#22C55E',
-    warning: '#F59E0B',
+    warning: '#EAB308',
     danger: '#EF4444',
-    icon: '#9CA3AF',
-    tabIconDefault: '#64748B',
-    tabIconSelected: '#3B82F6',
-    inputBg: '#1E293B',
-    progressBg: '#334155',
+    icon: '#A8A29E',
+    tabIconDefault: '#78716C',
+    tabIconSelected: '#F5C400',
+    inputBg: '#1C1917',
+    progressBg: '#44403C',
+    accent: '#FFD54F',
+    surface: '#292524',
   },
 };
 
@@ -59,11 +64,28 @@ export const Spacing = {
 };
 
 export const Radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
+  sm: 10,
+  md: 14,
+  lg: 18,
+  xl: 24,
   full: 999,
+};
+
+export const Shadows = {
+  card: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  soft: {
+    shadowColor: '#F5C400',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
 };
 
 export const Fonts = Platform.select({
@@ -82,7 +104,9 @@ export const Fonts = Platform.select({
   web: {
     sans: "system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
     serif: "Georgia, 'Times New Roman', serif",
-    rounded: "'SF Pro Rounded', 'Hiragino Maru Gothic ProN', Meiryo, 'MS PGothic', sans-serif",
-    mono: "SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace",
+    rounded: "'SF Pro Rounded', sans-serif",
+    mono: "SFMono-Regular, Menlo, Monaco, Consolas, monospace",
   },
 });
+
+export const VERSEMENT_JOURNALIER = 30000;

@@ -1,86 +1,332 @@
 /**
- * API VolleyTeam — couche d'accès aux données (SQLite local)
+ * API Bajaj Manager — couche d'accès aux données (SQLite local)
  */
 import { getDb, generateId, nowIso } from './database';
-import type { Member, Presence, PresenceStatus, Team, Training } from './types';
-import type { MemberFee } from './types';
+import type {
+  Bajaj,
+  Chauffeur,
+  Versement,
+  Frais,
+  BajajStatut,
+  ChauffeurStatut,
+  VersementStatut,
+  FraisType,
+} from './types';
+import { VERSEMENT_JOURNALIER } from '@/constants/theme';
 
-// ─── Teams ───────────────────────────────────────────────
+// ─── Chauffeurs ──────────────────────────────────────────
 
-export async function getTeam(): Promise<Team | null> {
+export async function getChauffeurs(): Promise<Chauffeur[]> {
   const db = await getDb();
-  return (await db.getFirstAsync<Team>('SELECT * FROM teams LIMIT 1')) ?? null;
+  return (
+    (await db.getAllAsync<Chauffeur>(
+      'SELECT * FROM chauffeurs ORDER BY nom ASC, prenom ASC'
+    )) ?? []
+  );
 }
 
-export async function updateTeam(id: string, updates: Partial<Team>): Promise<Team | null> {
+export async function getChauffeur(id: string): Promise<Chauffeur | null> {
   const db = await getDb();
+  return (
+    (await db.getFirstAsync<Chauffeur>('SELECT * FROM chauffeurs WHERE id = ?', [id])) ?? null
+  );
+}
+
+export async function createChauffeur(
+  data: Partial<Chauffeur> & { nom: string; prenom: string }
+): Promise<Chauffeur | null> {
+  const db = await getDb();
+  const id = generateId();
+  const now = nowIso();
+  await db.runAsync(
+    `INSERT INTO chauffeurs (id, nom, prenom, telephone, adresse, cin, photo, statut, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      data.nom,
+      data.prenom,
+      data.telephone ?? '',
+      data.adresse ?? null,
+      data.cin ?? null,
+      data.photo ?? null,
+      data.statut ?? 'actif',
+      now,
+      now,
+    ]
+  );
+  return getChauffeur(id);
+}
+
+export async function updateChauffeur(
+  id: string,
+  updates: Partial<Chauffeur>
+): Promise<Chauffeur | null> {
+  const db = await getDb();
+  const allowed = ['nom', 'prenom', 'telephone', 'adresse', 'cin', 'photo', 'statut'];
   const fields: string[] = [];
   const values: any[] = [];
   for (const [k, v] of Object.entries(updates)) {
-    if (k === 'id' || k === 'created_at') continue;
+    if (!allowed.includes(k)) continue;
+    fields.push(`${k} = ?`);
+    values.push(v);
+  }
+  if (fields.length === 0) return getChauffeur(id);
+  fields.push('updated_at = ?');
+  values.push(nowIso());
+  values.push(id);
+  await db.runAsync(`UPDATE chauffeurs SET ${fields.join(', ')} WHERE id = ?`, values);
+  return getChauffeur(id);
+}
+
+export async function deleteChauffeur(id: string): Promise<boolean> {
+  const db = await getDb();
+  // Désassigner des Bajaj
+  await db.runAsync('UPDATE bajajs SET chauffeur_id = NULL WHERE chauffeur_id = ?', [id]);
+  const result = await db.runAsync('DELETE FROM chauffeurs WHERE id = ?', [id]);
+  return (result.changes ?? 0) > 0;
+}
+
+// ─── Bajajs ──────────────────────────────────────────────
+
+export async function getBajajs(): Promise<Bajaj[]> {
+  const db = await getDb();
+  return (
+    (await db.getAllAsync<Bajaj>('SELECT * FROM bajajs ORDER BY matricule ASC')) ?? []
+  );
+}
+
+export async function getBajaj(id: string): Promise<Bajaj | null> {
+  const db = await getDb();
+  return (await db.getFirstAsync<Bajaj>('SELECT * FROM bajajs WHERE id = ?', [id])) ?? null;
+}
+
+export async function createBajaj(
+  data: Partial<Bajaj> & { marque: string; matricule: string }
+): Promise<Bajaj | null> {
+  const db = await getDb();
+  const id = generateId();
+  const now = nowIso();
+  await db.runAsync(
+    `INSERT INTO bajajs (id, marque, matricule, chauffeur_id, statut, photo, notes, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      data.marque,
+      data.matricule,
+      data.chauffeur_id ?? null,
+      data.statut ?? 'en_service',
+      data.photo ?? null,
+      data.notes ?? null,
+      now,
+      now,
+    ]
+  );
+  return getBajaj(id);
+}
+
+export async function updateBajaj(id: string, updates: Partial<Bajaj>): Promise<Bajaj | null> {
+  const db = await getDb();
+  const allowed = ['marque', 'matricule', 'chauffeur_id', 'statut', 'photo', 'notes'];
+  const fields: string[] = [];
+  const values: any[] = [];
+  for (const [k, v] of Object.entries(updates)) {
+    if (!allowed.includes(k)) continue;
+    fields.push(`${k} = ?`);
+    values.push(v);
+  }
+  if (fields.length === 0) return getBajaj(id);
+  fields.push('updated_at = ?');
+  values.push(nowIso());
+  values.push(id);
+  await db.runAsync(`UPDATE bajajs SET ${fields.join(', ')} WHERE id = ?`, values);
+  return getBajaj(id);
+}
+
+export async function deleteBajaj(id: string): Promise<boolean> {
+  const db = await getDb();
+  await db.runAsync('DELETE FROM versements WHERE bajaj_id = ?', [id]);
+  await db.runAsync('DELETE FROM frais WHERE bajaj_id = ?', [id]);
+  const result = await db.runAsync('DELETE FROM bajajs WHERE id = ?', [id]);
+  return (result.changes ?? 0) > 0;
+}
+
+// ─── Versements ──────────────────────────────────────────
+
+export async function getVersements(): Promise<Versement[]> {
+  const db = await getDb();
+  return (
+    (await db.getAllAsync<Versement>(
+      'SELECT * FROM versements ORDER BY date DESC, heure DESC'
+    )) ?? []
+  );
+}
+
+export async function getVersementsByDate(date: string): Promise<Versement[]> {
+  const db = await getDb();
+  return (
+    (await db.getAllAsync<Versement>(
+      'SELECT * FROM versements WHERE date = ? ORDER BY heure DESC',
+      [date]
+    )) ?? []
+  );
+}
+
+export async function getVersement(id: string): Promise<Versement | null> {
+  const db = await getDb();
+  return (
+    (await db.getFirstAsync<Versement>('SELECT * FROM versements WHERE id = ?', [id])) ?? null
+  );
+}
+
+function computeStatut(recu: number, attendu: number): VersementStatut {
+  if (recu >= attendu) return 'complet';
+  if (recu > 0) return 'partiel';
+  return 'impaye';
+}
+
+export async function createVersement(
+  data: Partial<Versement> & {
+    bajaj_id: string;
+    chauffeur_id: string;
+    date: string;
+    montant_recu: number;
+  }
+): Promise<Versement | null> {
+  const db = await getDb();
+  const id = generateId();
+  const now = nowIso();
+  const attendu = data.montant_attendu ?? VERSEMENT_JOURNALIER;
+  const recu = data.montant_recu;
+  const restant = Math.max(0, attendu - recu);
+  const statut = computeStatut(recu, attendu);
+  const heure =
+    data.heure ??
+    new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
+  await db.runAsync(
+    `INSERT INTO versements (
+      id, bajaj_id, chauffeur_id, date, heure, montant_recu, montant_attendu,
+      montant_restant, statut, note, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    [
+      id,
+      data.bajaj_id,
+      data.chauffeur_id,
+      data.date,
+      heure,
+      recu,
+      attendu,
+      restant,
+      statut,
+      data.note ?? null,
+      now,
+      now,
+    ]
+  );
+  return getVersement(id);
+}
+
+export async function updateVersement(
+  id: string,
+  updates: Partial<Versement>
+): Promise<Versement | null> {
+  const db = await getDb();
+  const current = await getVersement(id);
+  if (!current) return null;
+
+  const recu = updates.montant_recu ?? current.montant_recu;
+  const attendu = updates.montant_attendu ?? current.montant_attendu;
+  const restant = Math.max(0, attendu - recu);
+  const statut = computeStatut(recu, attendu);
+
+  const allowed = ['bajaj_id', 'chauffeur_id', 'date', 'heure', 'note'];
+  const fields: string[] = [
+    'montant_recu = ?',
+    'montant_attendu = ?',
+    'montant_restant = ?',
+    'statut = ?',
+  ];
+  const values: any[] = [recu, attendu, restant, statut];
+
+  for (const [k, v] of Object.entries(updates)) {
+    if (!allowed.includes(k)) continue;
     fields.push(`${k} = ?`);
     values.push(v);
   }
   fields.push('updated_at = ?');
   values.push(nowIso());
   values.push(id);
-  await db.runAsync(`UPDATE teams SET ${fields.join(', ')} WHERE id = ?`, values);
-  return (await db.getFirstAsync<Team>('SELECT * FROM teams WHERE id = ?', [id])) ?? null;
+  await db.runAsync(`UPDATE versements SET ${fields.join(', ')} WHERE id = ?`, values);
+  return getVersement(id);
 }
 
-// ─── Members ─────────────────────────────────────────────
-
-export async function getMembers(): Promise<Member[]> {
+export async function deleteVersement(id: string): Promise<boolean> {
   const db = await getDb();
-  return (await db.getAllAsync<Member>('SELECT * FROM members ORDER BY number ASC, last_name ASC')) ?? [];
+  const result = await db.runAsync('DELETE FROM versements WHERE id = ?', [id]);
+  return (result.changes ?? 0) > 0;
 }
 
-export async function getMember(id: string): Promise<Member | null> {
+// ─── Frais ───────────────────────────────────────────────
+
+export async function getFrais(): Promise<Frais[]> {
   const db = await getDb();
-  return (await db.getFirstAsync<Member>('SELECT * FROM members WHERE id = ?', [id])) ?? null;
+  return (
+    (await db.getAllAsync<Frais>('SELECT * FROM frais ORDER BY date DESC, heure DESC')) ?? []
+  );
 }
 
-export async function createMember(
-  member: Partial<Member> & { first_name: string; last_name: string }
-): Promise<Member | null> {
+export async function getFraisItem(id: string): Promise<Frais | null> {
   const db = await getDb();
-  const team = await getTeam();
-  if (!team) return null;
+  return (await db.getFirstAsync<Frais>('SELECT * FROM frais WHERE id = ?', [id])) ?? null;
+}
 
+export async function createFrais(
+  data: Partial<Frais> & { type: FraisType | string; bajaj_id: string; date: string; montant: number }
+): Promise<Frais | null> {
+  const db = await getDb();
   const id = generateId();
   const now = nowIso();
+  const heure =
+    data.heure ??
+    new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+
   await db.runAsync(
-    `INSERT INTO members (
-      id, team_id, first_name, last_name, number, position, phone, email,
-      birth_date, birth_place, address, status, avatar, qr_code, created_at, updated_at
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO frais (
+      id, type, bajaj_id, chauffeur_id, date, heure, description, piece,
+      montant, cause, photo, created_at, updated_at
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     [
       id,
-      team.id,
-      member.first_name,
-      member.last_name,
-      member.number ?? 0,
-      member.position ?? 'Réceptionneur-attaquant',
-      member.phone ?? '',
-      member.email ?? null,
-      member.birth_date ?? null,
-      member.birth_place ?? null,
-      member.address ?? null,
-      member.status ?? 'actif',
-      member.avatar ?? null,
-      `HMVB-${id}`,
+      data.type,
+      data.bajaj_id,
+      data.chauffeur_id ?? null,
+      data.date,
+      heure,
+      data.description ?? null,
+      data.piece ?? null,
+      data.montant,
+      data.cause ?? null,
+      data.photo ?? null,
       now,
       now,
     ]
   );
-  return getMember(id);
+  return getFraisItem(id);
 }
 
-export async function updateMember(id: string, updates: Partial<Member>): Promise<Member | null> {
+export async function updateFrais(id: string, updates: Partial<Frais>): Promise<Frais | null> {
   const db = await getDb();
   const allowed = [
-    'first_name', 'last_name', 'number', 'position', 'phone', 'email',
-    'birth_date', 'birth_place', 'address', 'status', 'avatar',
+    'type',
+    'bajaj_id',
+    'chauffeur_id',
+    'date',
+    'heure',
+    'description',
+    'piece',
+    'montant',
+    'cause',
+    'photo',
   ];
   const fields: string[] = [];
   const values: any[] = [];
@@ -89,422 +335,133 @@ export async function updateMember(id: string, updates: Partial<Member>): Promis
     fields.push(`${k} = ?`);
     values.push(v);
   }
-  if (fields.length === 0) return getMember(id);
+  if (fields.length === 0) return getFraisItem(id);
   fields.push('updated_at = ?');
   values.push(nowIso());
   values.push(id);
-  await db.runAsync(`UPDATE members SET ${fields.join(', ')} WHERE id = ?`, values);
-  return getMember(id);
+  await db.runAsync(`UPDATE frais SET ${fields.join(', ')} WHERE id = ?`, values);
+  return getFraisItem(id);
 }
 
-export async function deleteMember(id: string): Promise<boolean> {
+export async function deleteFrais(id: string): Promise<boolean> {
   const db = await getDb();
-  await db.runAsync('DELETE FROM presences WHERE member_id = ?', [id]);
-  const result = await db.runAsync('DELETE FROM members WHERE id = ?', [id]);
+  const result = await db.runAsync('DELETE FROM frais WHERE id = ?', [id]);
   return (result.changes ?? 0) > 0;
 }
 
-// ─── Trainings ───────────────────────────────────────────
+// ─── Stats Dashboard ─────────────────────────────────────
 
-export async function getTrainings(): Promise<Training[]> {
+export async function getDashboardStats() {
   const db = await getDb();
+  const today = new Date().toISOString().slice(0, 10);
+
+  const bajajs = (await db.getAllAsync<Bajaj>('SELECT * FROM bajajs')) ?? [];
+  const chauffeurs =
+    (await db.getAllAsync<Chauffeur>("SELECT * FROM chauffeurs WHERE statut = 'actif'")) ?? [];
+  const versementsToday =
+    (await db.getAllAsync<Versement>('SELECT * FROM versements WHERE date = ?', [today])) ?? [];
+
+  const totalRecu = versementsToday.reduce((s, v) => s + v.montant_recu, 0);
+  const totalAttendu = bajajs.filter((b) => b.statut === 'en_service').length * VERSEMENT_JOURNALIER;
+  const impayes = versementsToday.filter((v) => v.statut !== 'complet').length;
+  const complets = versementsToday.filter((v) => v.statut === 'complet').length;
+
+  return {
+    bajajCount: bajajs.length,
+    bajajEnService: bajajs.filter((b) => b.statut === 'en_service').length,
+    chauffeurCount: chauffeurs.length,
+    versementsToday: versementsToday.length,
+    totalRecu,
+    totalAttendu,
+    impayes,
+    complets,
+    versementsTodayList: versementsToday,
+  };
+}
+
+// ─── Positions GPS ───────────────────────────────────────
+
+export async function getPositions(bajajId?: string): Promise<import('./types').Position[]> {
+  const db = await getDb();
+  if (bajajId) {
+    return (
+      (await db.getAllAsync(
+        'SELECT * FROM positions WHERE bajaj_id = ? ORDER BY created_at DESC',
+        [bajajId]
+      )) ?? []
+    );
+  }
   return (
-    (await db.getAllAsync<Training>(
-      'SELECT * FROM trainings ORDER BY date DESC, start_time DESC'
-    )) ?? []
+    (await db.getAllAsync('SELECT * FROM positions ORDER BY created_at DESC LIMIT 100')) ?? []
   );
 }
 
-export async function getTraining(id: string): Promise<Training | null> {
+export async function getLatestPosition(bajajId: string): Promise<import('./types').Position | null> {
   const db = await getDb();
-  return (await db.getFirstAsync<Training>('SELECT * FROM trainings WHERE id = ?', [id])) ?? null;
-}
-
-export async function getTodayTraining(): Promise<Training | null> {
-  const db = await getDb();
-  const today = new Date().toISOString().slice(0, 10);
   return (
-    (await db.getFirstAsync<Training>(
-      'SELECT * FROM trainings WHERE date = ? ORDER BY start_time ASC LIMIT 1',
-      [today]
+    (await db.getFirstAsync(
+      'SELECT * FROM positions WHERE bajaj_id = ? ORDER BY created_at DESC LIMIT 1',
+      [bajajId]
     )) ?? null
   );
 }
 
-export async function createTraining(
-  training: Partial<Training> & { date: string; start_time: string; end_time: string }
-): Promise<Training | null> {
+export async function savePosition(data: {
+  bajaj_id: string;
+  latitude: number;
+  longitude: number;
+  accuracy?: number | null;
+  note?: string | null;
+}): Promise<import('./types').Position | null> {
   const db = await getDb();
-  const team = await getTeam();
-  if (!team) return null;
-
   const id = generateId();
   const now = nowIso();
   await db.runAsync(
-    `INSERT INTO trainings (id, team_id, date, start_time, end_time, location, notes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [
-      id,
-      team.id,
-      training.date,
-      training.start_time,
-      training.end_time,
-      training.location ?? '',
-      training.notes ?? null,
-      now,
-      now,
-    ]
+    `INSERT INTO positions (id, bajaj_id, latitude, longitude, accuracy, note, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    [id, data.bajaj_id, data.latitude, data.longitude, data.accuracy ?? null, data.note ?? null, now]
   );
-  return getTraining(id);
+  return (
+    (await db.getFirstAsync('SELECT * FROM positions WHERE id = ?', [id])) ?? null
+  );
 }
 
-export async function updateTraining(id: string, updates: Partial<Training>): Promise<Training | null> {
+export async function deletePosition(id: string): Promise<boolean> {
   const db = await getDb();
-  const allowed = ['date', 'start_time', 'end_time', 'location', 'notes'];
-  const fields: string[] = [];
-  const values: any[] = [];
-  for (const [k, v] of Object.entries(updates)) {
-    if (!allowed.includes(k)) continue;
-    fields.push(`${k} = ?`);
-    values.push(v);
-  }
-  if (fields.length === 0) return getTraining(id);
-  fields.push('updated_at = ?');
-  values.push(nowIso());
-  values.push(id);
-  await db.runAsync(`UPDATE trainings SET ${fields.join(', ')} WHERE id = ?`, values);
-  return getTraining(id);
-}
-
-export async function deleteTraining(id: string): Promise<boolean> {
-  const db = await getDb();
-  await db.runAsync('DELETE FROM presences WHERE training_id = ?', [id]);
-  const result = await db.runAsync('DELETE FROM trainings WHERE id = ?', [id]);
+  const result = await db.runAsync('DELETE FROM positions WHERE id = ?', [id]);
   return (result.changes ?? 0) > 0;
 }
 
-export type TrainingWithStats = Training & {
-  presents: number;
-  retards: number;
-  absents: number;
-  total_members: number;
-};
+// ─── Stats mensuelles ────────────────────────────────────
 
-export async function getTrainingsWithStats(): Promise<TrainingWithStats[]> {
-  const trainings = await getTrainings();
-  const members = await getMembers();
-  const activeCount = members.filter((m) => m.status === 'actif').length;
+export async function getMonthlyStats(year: number, month: number) {
   const db = await getDb();
+  const prefix = `${year}-${String(month).padStart(2, '0')}`;
+  const versements =
+    (await db.getAllAsync<import('./types').Versement>(
+      `SELECT * FROM versements WHERE date LIKE ?`,
+      [`${prefix}%`]
+    )) ?? [];
+  const fraisList =
+    (await db.getAllAsync<import('./types').Frais>(
+      `SELECT * FROM frais WHERE date LIKE ?`,
+      [`${prefix}%`]
+    )) ?? [];
 
-  const result: TrainingWithStats[] = [];
-  for (const t of trainings) {
-    const rows = await db.getAllAsync<{ status: string; cnt: number }>(
-      `SELECT status, COUNT(*) as cnt FROM presences WHERE training_id = ? GROUP BY status`,
-      [t.id]
-    );
-    const map: Record<string, number> = {};
-    for (const r of rows) map[r.status] = r.cnt;
-    const presents = map['present'] ?? 0;
-    const retards = map['retard'] ?? 0;
-    const recorded = presents + retards + (map['absent'] ?? 0);
-    const absents = Math.max(0, activeCount - presents - retards);
-    result.push({
-      ...t,
-      presents,
-      retards,
-      absents: recorded > 0 ? absents : activeCount,
-      total_members: activeCount,
-    });
-  }
-  return result;
-}
+  const totalRecu = versements.reduce((s, v) => s + v.montant_recu, 0);
+  const totalFrais = fraisList.reduce((s, f) => s + f.montant, 0);
+  const complets = versements.filter((v) => v.statut === 'complet').length;
+  const partiels = versements.filter((v) => v.statut === 'partiel').length;
+  const impayes = versements.filter((v) => v.statut === 'impaye').length;
 
-// ─── Presences ───────────────────────────────────────────
-
-export async function getPresencesForTraining(trainingId: string): Promise<(Presence & { member?: Member })[]> {
-  const db = await getDb();
-  const rows = await db.getAllAsync<Presence>(
-    'SELECT * FROM presences WHERE training_id = ?',
-    [trainingId]
-  );
-  const members = await getMembers();
-  const byId = Object.fromEntries(members.map((m) => [m.id, m]));
-  return (rows ?? []).map((p) => ({ ...p, member: byId[p.member_id] }));
-}
-
-export async function setPresence(
-  trainingId: string,
-  memberId: string,
-  status: PresenceStatus,
-  time?: string
-): Promise<Presence | null> {
-  const db = await getDb();
-  const now = nowIso();
-  const existing = await db.getFirstAsync<Presence>(
-    'SELECT * FROM presences WHERE training_id = ? AND member_id = ?',
-    [trainingId, memberId]
-  );
-
-  if (existing) {
-    await db.runAsync(
-      'UPDATE presences SET status = ?, time = ?, updated_at = ? WHERE id = ?',
-      [status, time ?? existing.time ?? null, now, existing.id]
-    );
-    return (
-      (await db.getFirstAsync<Presence>('SELECT * FROM presences WHERE id = ?', [existing.id])) ??
-      null
-    );
-  }
-
-  const id = generateId();
-  await db.runAsync(
-    `INSERT INTO presences (id, training_id, member_id, status, time, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
-    [id, trainingId, memberId, status, time ?? null, now, now]
-  );
-  return (await db.getFirstAsync<Presence>('SELECT * FROM presences WHERE id = ?', [id])) ?? null;
-}
-
-export async function getMemberPresenceStats(memberId: string): Promise<{
-  presents: number;
-  retards: number;
-  absents: number;
-  total: number;
-  rate: number;
-}> {
-  const db = await getDb();
-  const rows = await db.getAllAsync<{ status: string; cnt: number }>(
-    `SELECT status, COUNT(*) as cnt FROM presences WHERE member_id = ? GROUP BY status`,
-    [memberId]
-  );
-  const map: Record<string, number> = {};
-  for (const r of rows ?? []) map[r.status] = r.cnt;
-  const presents = map['present'] ?? 0;
-  const retards = map['retard'] ?? 0;
-  const absents = map['absent'] ?? 0;
-  const total = presents + retards + absents;
-  const rate = total === 0 ? 0 : Math.round(((presents + retards * 0.5) / total) * 100);
-  return { presents, retards, absents, total, rate };
-}
-
-export async function getGlobalStats(): Promise<{
-  trainingsCount: number;
-  avgRate: number;
-  presents: number;
-  retards: number;
-  absents: number;
-}> {
-  const db = await getDb();
-  const trainingsCount =
-    (await db.getFirstAsync<{ c: number }>('SELECT COUNT(*) as c FROM trainings'))?.c ?? 0;
-  const rows = await db.getAllAsync<{ status: string; cnt: number }>(
-    `SELECT status, COUNT(*) as cnt FROM presences GROUP BY status`
-  );
-  const map: Record<string, number> = {};
-  for (const r of rows ?? []) map[r.status] = r.cnt;
-  const presents = map['present'] ?? 0;
-  const retards = map['retard'] ?? 0;
-  const absents = map['absent'] ?? 0;
-  const total = presents + retards + absents;
-  const avgRate = total === 0 ? 0 : Math.round(((presents + retards * 0.5) / total) * 100);
-  return { trainingsCount, avgRate, presents, retards, absents };
-}
-
-// ─── Notifications (local) ───────────────────────────────
-
-export async function addNotification(title: string, body?: string, icon?: string, color?: string) {
-  const db = await getDb();
-  const id = generateId();
-  await db.runAsync(
-    `INSERT INTO notifications (id, title, body, icon, color, read, created_at) VALUES (?, ?, ?, ?, ?, 0, ?)`,
-    [id, title, body ?? null, icon ?? null, color ?? null, nowIso()]
-  );
-}
-
-export async function getNotifications() {
-  const db = await getDb();
-  return (
-    (await db.getAllAsync<{
-      id: string;
-      title: string;
-      body: string | null;
-      icon: string | null;
-      color: string | null;
-      read: number;
-      created_at: string;
-    }>('SELECT * FROM notifications ORDER BY created_at DESC LIMIT 50')) ?? []
-  );
-}
-
-// ─── Helpers format ──────────────────────────────────────
-
-export function formatDateFr(dateStr: string): string {
-  const d = new Date(dateStr + 'T12:00:00');
-  const days = ['DIM', 'LUN', 'MAR', 'MER', 'JEU', 'VEN', 'SAM'];
-  const months = ['JAN', 'FÉV', 'MAR', 'AVR', 'MAI', 'JUN', 'JUL', 'AOÛ', 'SEP', 'OCT', 'NOV', 'DÉC'];
-  return `${days[d.getDay()]}. ${String(d.getDate()).padStart(2, '0')} ${months[d.getMonth()]}. ${d.getFullYear()}`;
-}
-
-export function isToday(dateStr: string): boolean {
-  return dateStr === new Date().toISOString().slice(0, 10);
-}
-
-// ─── Historique saison & nettoyage auto ──────────────────
-
-export type HistoryRow = {
-  training_id: string;
-  date: string;
-  start_time: string;
-  end_time: string;
-  location: string;
-  member_id: string;
-  first_name: string;
-  last_name: string;
-  number: number;
-  position: string;
-  status: string;
-  time: string | null;
-};
-
-export async function getSeasonHistory(): Promise<HistoryRow[]> {
-  const db = await getDb();
-  const rows = await db.getAllAsync<HistoryRow>(`
-    SELECT
-      t.id as training_id,
-      t.date,
-      t.start_time,
-      t.end_time,
-      t.location,
-      m.id as member_id,
-      m.first_name,
-      m.last_name,
-      m.number,
-      m.position,
-      COALESCE(p.status, 'absent') as status,
-      p.time
-    FROM trainings t
-    CROSS JOIN members m
-    LEFT JOIN presences p ON p.training_id = t.id AND p.member_id = m.id
-    WHERE m.status = 'actif'
-    ORDER BY t.date DESC, t.start_time DESC, m.number ASC
-  `);
-  return rows ?? [];
-}
-
-/** Génère un CSV compatible Excel (séparateur ;) */
-export function historyToCsv(rows: HistoryRow[]): string {
-  const header = 'Date;Heure début;Heure fin;Lieu;N°;Nom;Prénom;Position;Statut;Heure pointage';
-  const lines = rows.map((r) => {
-    const status =
-      r.status === 'present' ? 'Présent' : r.status === 'retard' ? 'En retard' : 'Absent';
-    return [
-      r.date,
-      r.start_time,
-      r.end_time,
-      `"${(r.location || '').replace(/"/g, '""')}"`,
-      r.number,
-      `"${r.last_name.replace(/"/g, '""')}"`,
-      `"${r.first_name.replace(/"/g, '""')}"`,
-      `"${(r.position || '').replace(/"/g, '""')}"`,
-      status,
-      r.time || '',
-    ].join(';');
-  });
-  // BOM UTF-8 for Excel
-  return '\uFEFF' + [header, ...lines].join('\n');
-}
-
-/**
- * Supprime les entraînements dont l'heure de fin est dépassée.
- * Conserves les présences liées? Non — on archive en gardant historique via soft? User asked delete.
- * On supprime l'entraînement ET ses présences (CASCADE déjà en schema).
- * ATTENTION: cela efface l'historique. Better: only delete if user wants auto-clean of past sessions
- * from the list but keep data... User said "supprimer automatiquement l'entrainement une fois heure de fin atteint"
- * So delete from trainings table. History export should run before or we keep presences?
- * Schema has ON DELETE CASCADE on presences. For history we need to either soft-delete or keep.
- * I'll soft-delete: add archived flag, or move to history.
- * Simpler approach without migration issues: mark as ended by filtering them out of active list
- * but user said "supprimer". I'll delete trainings past end time from active views by deleting them
- * BUT first ensure history is stored... Actually the history query joins trainings - if deleted, history gone.
- *
- * Solution: add column `ended` INTEGER DEFAULT 0, set to 1 when past end, hide from list.
- * Or keep trainings and just not show as "upcoming". User said delete auto though.
- *
- * I'll implement cleanup that soft-archives via status column on trainings.
- */
-/**
- * Anciennement : archivait les séances passées.
- * DÉSACTIVÉ : l'historique des présences et les séances restent
- * toujours en base jusqu'à suppression manuelle par le coach.
- */
-export async function cleanupExpiredTrainings(): Promise<number> {
-  // Ne supprime / n'archive plus rien automatiquement
-  return 0;
-}
-
-/** Tous les entraînements (y compris terminés) avec stats — rien n'est auto-supprimé */
-export async function getActiveTrainingsWithStats() {
-  return getTrainingsWithStats();
-}
-
-
-// ─── Écolage (janvier → décembre) ────────────────────────
-
-
-export async function getMemberFees(memberId: string, year: number): Promise<MemberFee[]> {
-  const db = await getDb();
-  // Ensure 12 months exist
-  const now = nowIso();
-  for (let month = 1; month <= 12; month++) {
-    const existing = await db.getFirstAsync<{ id: string }>(
-      'SELECT id FROM member_fees WHERE member_id = ? AND year = ? AND month = ?',
-      [memberId, year, month]
-    );
-    if (!existing) {
-      await db.runAsync(
-        `INSERT INTO member_fees (id, member_id, year, month, paid, amount, paid_at, notes, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 0, null, null, null, ?, ?)`,
-        [generateId(), memberId, year, month, now, now]
-      );
-    }
-  }
-  return (
-    (await db.getAllAsync<MemberFee>(
-      'SELECT * FROM member_fees WHERE member_id = ? AND year = ? ORDER BY month ASC',
-      [memberId, year]
-    )) ?? []
-  );
-}
-
-export async function setMemberFeePaid(
-  memberId: string,
-  year: number,
-  month: number,
-  paid: boolean,
-  amount?: number | null
-): Promise<void> {
-  const db = await getDb();
-  const now = nowIso();
-  const row = await db.getFirstAsync<{ id: string }>(
-    'SELECT id FROM member_fees WHERE member_id = ? AND year = ? AND month = ?',
-    [memberId, year, month]
-  );
-  if (row) {
-    await db.runAsync(
-      `UPDATE member_fees SET paid = ?, amount = ?, paid_at = ?, updated_at = ? WHERE id = ?`,
-      [paid ? 1 : 0, amount ?? null, paid ? now : null, now, row.id]
-    );
-  } else {
-    await db.runAsync(
-      `INSERT INTO member_fees (id, member_id, year, month, paid, amount, paid_at, notes, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, null, ?, ?)`,
-      [generateId(), memberId, year, month, paid ? 1 : 0, amount ?? null, paid ? now : null, now, now]
-    );
-  }
-}
-
-export async function getMemberFeeSummary(memberId: string, year: number): Promise<{ paid: number; total: number }> {
-  const fees = await getMemberFees(memberId, year);
-  const paid = fees.filter((f) => f.paid === 1).length;
-  return { paid, total: 12 };
+  return {
+    totalRecu,
+    totalFrais,
+    benefice: totalRecu - totalFrais,
+    versementsCount: versements.length,
+    complets,
+    partiels,
+    impayes,
+    fraisCount: fraisList.length,
+  };
 }

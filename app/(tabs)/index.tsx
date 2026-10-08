@@ -11,42 +11,24 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
-import { Colors, Radius } from '@/constants/theme';
-import {
-  getTeam,
-  getMembers,
-  getActiveTrainingsWithStats,
-  getGlobalStats,
-  type TrainingWithStats,
-} from '@/lib/api';
-import type { Team } from '@/lib/types';
+import { LinearGradient } from 'expo-linear-gradient';
+import { MotiView } from 'moti';
+import { Colors, Radius, VERSEMENT_JOURNALIER } from '@/constants/theme';
+import { getDashboardStats } from '@/lib/api';
 import { IconSymbol } from '@/components/ui/icon-symbol';
-import { ProgressBar } from '@/components/volley/ProgressBar';
-import { PrimaryButton } from '@/components/volley/PrimaryButton';
-import { EmptyState } from '@/components/volley/EmptyState';
+import { PrimaryButton } from '@/components/common/PrimaryButton';
+import { AnimatedSection, AnimatedCard } from '@/components/common/AnimatedSection';
 
 export default function AccueilScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [team, setTeam] = useState<Team | null>(null);
-  const [memberCount, setMemberCount] = useState(0);
-  const [today, setToday] = useState<TrainingWithStats | null>(null);
-  const [stats, setStats] = useState({ avgRate: 0, trainingsCount: 0 });
+  const [stats, setStats] = useState<Awaited<ReturnType<typeof getDashboardStats>> | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
   const load = async () => {
-    const [t, members, trainings, g] = await Promise.all([
-      getTeam(),
-      getMembers(),
-      getActiveTrainingsWithStats(),
-      getGlobalStats(),
-    ]);
-    setTeam(t);
-    setMemberCount(members.filter((m) => m.status === 'actif').length);
-    const todayStr = new Date().toISOString().slice(0, 10);
-    setToday(trainings.find((x) => x.date === todayStr) ?? trainings[0] ?? null);
-    setStats({ avgRate: g.avgRate, trainingsCount: g.trainingsCount });
+    const s = await getDashboardStats();
+    setStats(s);
     setLoading(false);
     setRefreshing(false);
   };
@@ -57,7 +39,7 @@ export default function AccueilScreen() {
     }, [])
   );
 
-  if (loading) {
+  if (loading || !stats) {
     return (
       <View style={[styles.container, styles.center]}>
         <ActivityIndicator size="large" color={Colors.light.primary} />
@@ -65,35 +47,41 @@ export default function AccueilScreen() {
     );
   }
 
-  const presentCount = today?.presents ?? 0;
-  const total = today?.total_members ?? memberCount;
-  const rate = total > 0 ? Math.round((presentCount / total) * 100) : 0;
+  const rate =
+    stats.totalAttendu > 0
+      ? Math.round((stats.totalRecu / stats.totalAttendu) * 100)
+      : 0;
 
   return (
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
+      <LinearGradient
+        colors={['#1A1A1A', '#2A2A2A']}
+        style={[styles.header, { paddingTop: insets.top + 12 }]}
+      >
         <View style={styles.headerTop}>
           <View style={styles.logoRow}>
             <View style={styles.logoCircle}>
-              <Text style={styles.logoEmoji}>🏐</Text>
+              <Text style={styles.logoEmoji}>{'🛺'}</Text>
             </View>
             <View>
-              <Text style={styles.greeting}>Bonjour Coach 👋</Text>
-              <Text style={styles.teamName}>
-                {team?.name ?? 'Volley Team'} · {team?.category ?? 'Senior'}
-              </Text>
+              <Text style={styles.greeting}>Bonjour {'👋'}</Text>
+              <Text style={styles.teamName}>Bajaj Manager</Text>
             </View>
           </View>
-          <TouchableOpacity style={styles.bellBtn} onPress={() => router.push('/notifications')}>
-            <IconSymbol name="bell.fill" size={22} color="#fff" />
+          <TouchableOpacity
+            style={styles.bellBtn}
+            onPress={() => router.push('/notifications')}
+          >
+            <IconSymbol name="bell.fill" size={22} color={Colors.light.primary} />
           </TouchableOpacity>
         </View>
-      </View>
+        <View style={styles.headerAccent} />
+      </LinearGradient>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={{ paddingBottom: 32 }}
+        contentContainerStyle={{ paddingBottom: 40 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -102,118 +90,105 @@ export default function AccueilScreen() {
               setRefreshing(true);
               load();
             }}
+            tintColor={Colors.light.primary}
           />
         }
       >
-        {today ? (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Prochain entraînement</Text>
-            <View style={styles.trainingRow}>
-              <View style={styles.dateBox}>
-                <IconSymbol name="calendar" size={18} color={Colors.light.primary} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.trainingDate}>
-                  {today.date === new Date().toISOString().slice(0, 10)
-                    ? "Aujourd'hui"
-                    : today.date}
-                </Text>
-                <Text style={styles.trainingTime}>
-                  {today.start_time} – {today.end_time}
-                </Text>
-                <View style={styles.locRow}>
-                  <IconSymbol name="mappin" size={14} color={Colors.light.textSecondary} />
-                  <Text style={styles.locText}>{today.location || '—'}</Text>
-                </View>
-              </View>
+        <View style={styles.statsRow}>
+          <AnimatedCard index={0} style={{ flex: 1 }}>
+            <View style={[styles.statCard, { backgroundColor: '#FFF8E1' }]}>
+              <IconSymbol name="car.fill" size={24} color={Colors.light.primaryDark} />
+              <Text style={styles.statValue}>{stats.bajajEnService}</Text>
+              <Text style={styles.statLabel}>En service</Text>
             </View>
-
-            {total > 0 && (
-              <>
-                <View style={styles.presenceRow}>
-                  <Text style={styles.presenceCount}>
-                    {presentCount} présents / {total}
-                  </Text>
-                  <Text style={styles.presencePct}>{rate}%</Text>
-                </View>
-                <ProgressBar progress={rate} height={10} />
-              </>
-            )}
-
-            <PrimaryButton
-              title="Ouvrir le QR"
-              icon="qrcode"
-              onPress={() => router.push(`/qr-coach?id=${today.id}`)}
-              style={{ marginTop: 16 }}
-            />
-          </View>
-        ) : (
-          <View style={styles.card}>
-            <EmptyState
-              message={"Aucune donnée enregistrée\nCréez un entraînement pour commencer"}
-              icon="calendar"
-            />
-            <PrimaryButton
-              title="Créer un entraînement"
-              icon="plus"
-              onPress={() => router.push('/ajouter-entrainement')}
-            />
-          </View>
-        )}
-
-        {today && total > 0 && (
-          <View style={styles.card}>
-            <Text style={styles.cardLabel}>Présence</Text>
-            <View style={styles.statsRow}>
-              <View style={styles.statItem}>
-                <View style={[styles.statDot, { backgroundColor: Colors.light.success }]} />
-                <Text style={styles.statNum}>{today.presents}</Text>
-                <Text style={styles.statLabel}>Présents</Text>
-              </View>
-              <View style={styles.statItem}>
-                <View style={[styles.statDot, { backgroundColor: Colors.light.warning }]} />
-                <Text style={styles.statNum}>{today.retards}</Text>
-                <Text style={styles.statLabel}>En retard</Text>
-              </View>
-              <View style={styles.statItem}>
-                <View style={[styles.statDot, { backgroundColor: Colors.light.danger }]} />
-                <Text style={styles.statNum}>{today.absents}</Text>
-                <Text style={styles.statLabel}>Absents</Text>
-              </View>
+          </AnimatedCard>
+          <AnimatedCard index={1} style={{ flex: 1 }}>
+            <View style={[styles.statCard, { backgroundColor: '#F0FDF4' }]}>
+              <IconSymbol name="person.2.fill" size={24} color={Colors.light.success} />
+              <Text style={styles.statValue}>{stats.chauffeurCount}</Text>
+              <Text style={styles.statLabel}>Chauffeurs</Text>
             </View>
-            <TouchableOpacity
-              style={styles.linkRow}
-              onPress={() => router.push(`/presence-list?id=${today.id}`)}
-            >
-              <Text style={styles.linkText}>Voir la liste complète</Text>
-              <IconSymbol name="chevron.right" size={18} color={Colors.light.primary} />
-            </TouchableOpacity>
-          </View>
-        )}
-
-        <View style={styles.quickRow}>
-          <TouchableOpacity style={styles.quickCard} onPress={() => router.push('/(tabs)/equipe')}>
-            <View style={[styles.quickIcon, { backgroundColor: '#DBEAFE' }]}>
-              <IconSymbol name="person.2.fill" size={22} color={Colors.light.primary} />
-            </View>
-            <Text style={styles.quickLabel}>Équipe</Text>
-            <Text style={styles.quickSub}>
-              {memberCount} membre{memberCount !== 1 ? 's' : ''}
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.quickCard}
-            onPress={() => router.push('/(tabs)/presences')}
-          >
-            <View style={[styles.quickIcon, { backgroundColor: '#DCFCE7' }]}>
-              <IconSymbol name="chart.bar.fill" size={22} color={Colors.light.success} />
-            </View>
-            <Text style={styles.quickLabel}>Stats</Text>
-            <Text style={styles.quickSub}>
-              {stats.trainingsCount === 0 ? 'Aucune donnée' : `${stats.avgRate}% moyenne`}
-            </Text>
-          </TouchableOpacity>
+          </AnimatedCard>
         </View>
+
+        <AnimatedSection delay={150}>
+          <View style={styles.card}>
+            <View style={styles.cardHeader}>
+              <Text style={styles.cardTitle}>Versements du jour</Text>
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{stats.versementsToday}</Text>
+              </View>
+            </View>
+
+            <View style={styles.amountRow}>
+              <View>
+                <Text style={styles.amountLabel}>Reçu</Text>
+                <Text style={styles.amountValue}>
+                  {stats.totalRecu.toLocaleString('fr-FR')} Ar
+                </Text>
+              </View>
+              <View style={{ alignItems: 'flex-end' }}>
+                <Text style={styles.amountLabel}>Attendu</Text>
+                <Text style={[styles.amountValue, { color: Colors.light.textSecondary }]}>
+                  {stats.totalAttendu.toLocaleString('fr-FR')} Ar
+                </Text>
+              </View>
+            </View>
+
+            <View style={styles.progressBg}>
+              <MotiView
+                from={{ width: '0%' as any }}
+                animate={{ width: `${Math.min(rate, 100)}%` as any }}
+                transition={{ type: 'timing', duration: 800, delay: 300 }}
+                style={styles.progressFill}
+              />
+            </View>
+            <Text style={styles.progressText}>{rate}% collecté</Text>
+
+            <View style={styles.statusRow}>
+              <View style={styles.statusItem}>
+                <View style={[styles.dot, { backgroundColor: Colors.light.success }]} />
+                <Text style={styles.statusText}>{stats.complets} complets</Text>
+              </View>
+              <View style={styles.statusItem}>
+                <View style={[styles.dot, { backgroundColor: Colors.light.warning }]} />
+                <Text style={styles.statusText}>{stats.impayes} restants</Text>
+              </View>
+            </View>
+          </View>
+        </AnimatedSection>
+
+        <AnimatedSection delay={250}>
+          <Text style={styles.sectionTitle}>Actions rapides</Text>
+          <PrimaryButton
+            title="Nouveau versement"
+            icon="plus.circle.fill"
+            onPress={() => router.push('/ajouter-versement')}
+          />
+          <PrimaryButton
+            title="Ajouter un Bajaj"
+            icon="car.fill"
+            variant="outline"
+            onPress={() => router.push('/ajouter-bajaj')}
+            style={{ marginTop: 10 }}
+          />
+          <PrimaryButton
+            title="Ajouter un chauffeur"
+            icon="person.badge.plus"
+            variant="dark"
+            onPress={() => router.push('/ajouter-chauffeur')}
+            style={{ marginTop: 10 }}
+          />
+        </AnimatedSection>
+
+        <AnimatedSection delay={350}>
+          <View style={styles.infoBox}>
+            <IconSymbol name="info.circle" size={18} color={Colors.light.primaryDark} />
+            <Text style={styles.infoText}>
+              Versement journalier : {VERSEMENT_JOURNALIER.toLocaleString('fr-FR')} Ar
+            </Text>
+          </View>
+        </AnimatedSection>
       </ScrollView>
     </View>
   );
@@ -223,9 +198,16 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
   center: { alignItems: 'center', justifyContent: 'center' },
   header: {
-    backgroundColor: Colors.light.header,
     paddingHorizontal: 20,
-    paddingBottom: 20,
+    paddingBottom: 22,
+  },
+  headerAccent: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: Colors.light.primary,
   },
   headerTop: {
     flexDirection: 'row',
@@ -234,110 +216,111 @@ const styles = StyleSheet.create({
   },
   logoRow: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   logoCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  logoEmoji: { fontSize: 22 },
-  greeting: { color: '#fff', fontSize: 18, fontWeight: '700' },
-  teamName: { color: 'rgba(255,255,255,0.7)', fontSize: 13, marginTop: 2 },
-  bellBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  scroll: { flex: 1, marginTop: -8 },
-  card: {
-    backgroundColor: Colors.light.card,
-    marginHorizontal: 16,
-    marginTop: 16,
-    borderRadius: Radius.lg,
-    padding: 18,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 3,
-  },
-  cardLabel: {
-    fontSize: 13,
-    fontWeight: '600',
-    color: Colors.light.textSecondary,
-    marginBottom: 12,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  trainingRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
-  dateBox: {
-    width: 40,
-    height: 40,
-    borderRadius: 10,
-    backgroundColor: '#DBEAFE',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  trainingDate: { fontSize: 16, fontWeight: '700', color: Colors.light.text },
-  trainingTime: { fontSize: 14, color: Colors.light.textSecondary, marginTop: 2 },
-  locRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 4 },
-  locText: { fontSize: 13, color: Colors.light.textSecondary },
-  presenceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 8,
-  },
-  presenceCount: { fontSize: 14, fontWeight: '600', color: Colors.light.text },
-  presencePct: { fontSize: 14, fontWeight: '700', color: Colors.light.success },
-  statsRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginBottom: 12,
-  },
-  statItem: { alignItems: 'center', gap: 4 },
-  statDot: { width: 10, height: 10, borderRadius: 5 },
-  statNum: { fontSize: 22, fontWeight: '700', color: Colors.light.text },
-  statLabel: { fontSize: 12, color: Colors.light.textSecondary },
-  linkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 4,
-    paddingTop: 8,
-    borderTopWidth: 1,
-    borderTopColor: Colors.light.border,
-  },
-  linkText: { fontSize: 14, fontWeight: '600', color: Colors.light.primary },
-  quickRow: {
-    flexDirection: 'row',
-    gap: 12,
-    marginHorizontal: 16,
-    marginTop: 16,
-  },
-  quickCard: {
-    flex: 1,
-    backgroundColor: Colors.light.card,
-    borderRadius: Radius.lg,
-    padding: 16,
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
-  },
-  quickIcon: {
     width: 48,
     height: 48,
-    borderRadius: 14,
+    borderRadius: 24,
+    backgroundColor: Colors.light.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 8,
   },
-  quickLabel: { fontSize: 14, fontWeight: '600', color: Colors.light.text },
-  quickSub: { fontSize: 12, color: Colors.light.textSecondary, marginTop: 2 },
+  logoEmoji: { fontSize: 26 },
+  greeting: { color: 'rgba(255,255,255,0.7)', fontSize: 13 },
+  teamName: { color: Colors.light.primary, fontSize: 18, fontWeight: '800' },
+  bellBtn: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    backgroundColor: 'rgba(245, 196, 0, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  scroll: { flex: 1, paddingHorizontal: 16, paddingTop: 16 },
+  statsRow: { flexDirection: 'row', gap: 12, marginBottom: 16 },
+  statCard: {
+    borderRadius: Radius.lg,
+    padding: 18,
+    alignItems: 'center',
+    gap: 6,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  statValue: { fontSize: 30, fontWeight: '800', color: Colors.light.text },
+  statLabel: { fontSize: 12, color: Colors.light.textSecondary, fontWeight: '500' },
+  card: {
+    backgroundColor: Colors.light.card,
+    borderRadius: Radius.lg,
+    padding: 18,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+  },
+  cardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 14,
+  },
+  cardTitle: { fontSize: 16, fontWeight: '700', color: Colors.light.text },
+  badge: {
+    backgroundColor: Colors.light.primary,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+  },
+  badgeText: { fontSize: 12, fontWeight: '800', color: '#1A1A1A' },
+  amountRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 12,
+  },
+  amountLabel: { fontSize: 12, color: Colors.light.textMuted },
+  amountValue: { fontSize: 20, fontWeight: '800', color: Colors.light.primaryDark },
+  progressBg: {
+    height: 10,
+    backgroundColor: Colors.light.progressBg,
+    borderRadius: 5,
+    overflow: 'hidden',
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: Colors.light.primary,
+    borderRadius: 5,
+  },
+  progressText: {
+    fontSize: 12,
+    color: Colors.light.textSecondary,
+    marginTop: 6,
+    textAlign: 'right',
+    fontWeight: '600',
+  },
+  statusRow: { flexDirection: 'row', gap: 20, marginTop: 12 },
+  statusItem: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dot: { width: 8, height: 8, borderRadius: 4 },
+  statusText: { fontSize: 13, color: Colors.light.textSecondary },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.light.text,
+    marginBottom: 12,
+  },
+  infoBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    backgroundColor: Colors.light.surface,
+    borderRadius: Radius.md,
+    padding: 14,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
+    marginTop: 20,
+  },
+  infoText: { flex: 1, fontSize: 13, color: Colors.light.textSecondary, fontWeight: '500' },
 });

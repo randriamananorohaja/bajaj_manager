@@ -1,26 +1,31 @@
-# VolleyTeam
+# Bajaj Manager — Premium
 
-Application coach — gestion d'équipe volleyball.
+Application mobile de gestion de flotte Bajaj (Mahajanga, Madagascar).
 
-## Identifiants coach
-- **Numéro :** `0347180709`
-- **Mot de passe :** `Dera301`
+## Design
+- Thème **jaune tuk-tuk** (#F5C400) + noir premium
+- Animations Moti (sections, cartes, progression)
+- Icônes Material corrigées (plus de « ? »)
+- Tab bar noire avec accent jaune
 
 ## Fonctionnalités
-- Login coach unique
-- Membres (CRUD) + avatar + date/lieu naissance + adresse + **QR personnel**
-- Entraînements (CRUD) + date/heure pickers
-- **Pointage :** le coach scanne le QR de chaque joueur
-- Historique saison + **export Excel (CSV)**
-- Archivage auto des entraînements passés l'heure de fin
-- Base SQLite locale
+- CRUD Bajaj (recherche matricule/marque)
+- CRUD Chauffeurs + photo
+- Versements journaliers 30 000 Ar
+- Frais (visite, vidange, réparation) + photo facture
+- GPS positions
+- Statistiques mensuelles
+- Export CSV Excel
+- Historique unifié
 
 ## Installation
-
 ```bash
 npm install
-# ou pour aligner les versions Expo :
-npx expo install expo-sqlite expo-camera expo-image-picker @react-native-community/datetimepicker @react-native-async-storage/async-storage expo-file-system expo-sharing react-native-svg react-native-qrcode-svg
-
+npx expo install expo-location
 npx expo start
 ```
+
+## Connexion
+- Téléphone : `0340000000`
+- Mot de passe : `bajaj2026`
+# bajaj_manager

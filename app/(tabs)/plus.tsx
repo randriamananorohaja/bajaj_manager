@@ -7,26 +7,25 @@ import {
   TouchableOpacity,
   StatusBar,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { Colors, Radius } from '@/constants/theme';
-import { getTeam } from '@/lib/api';
 import { logout, getSession } from '@/lib/auth';
-import type { Team } from '@/lib/types';
+import { exportVersementsCsv, exportFraisCsv } from '@/lib/export';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 
 export default function PlusScreen() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const [team, setTeam] = useState<Team | null>(null);
-  const [coachName, setCoachName] = useState('Coach');
+  const [ownerName, setOwnerName] = useState('Propriétaire');
+  const [exporting, setExporting] = useState(false);
 
   useFocusEffect(
     useCallback(() => {
-      getTeam().then(setTeam);
       getSession().then((s) => {
-        if (s?.name) setCoachName(s.name);
+        if (s?.name) setOwnerName(s.name);
       });
     }, [])
   );
@@ -45,31 +44,50 @@ export default function PlusScreen() {
     ]);
   };
 
+  const handleExportVersements = async () => {
+    setExporting(true);
+    try {
+      await exportVersementsCsv();
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const handleExportFrais = async () => {
+    setExporting(true);
+    try {
+      await exportFraisCsv();
+    } finally {
+      setExporting(false);
+    }
+  };
+
   const menu = [
     {
-      section: 'Mon compte',
+      section: 'Gestion',
       items: [
         {
-          icon: 'person.fill',
-          label: coachName,
-          value: team?.name || 'Volley Team',
-          route: '/profil-equipe',
+          icon: 'wrench.and.screwdriver.fill',
+          label: 'Frais & Entretiens',
+          value: 'Visite, vidange, réparation',
+          route: '/ajouter-frais',
         },
-      ],
-    },
-    {
-      section: 'Équipe & données',
-      items: [
         {
-          icon: 'person.2.fill',
-          label: 'Équipe',
-          value: team?.name || 'Volley Team',
-          route: '/profil-equipe',
+          icon: 'location.fill',
+          label: 'GPS — Suivi Bajaj',
+          value: 'Enregistrer / consulter positions',
+          route: '/gps',
         },
         {
           icon: 'chart.bar.fill',
-          label: 'Historique des présences',
-          value: 'Saison complète · Export Excel',
+          label: 'Statistiques',
+          value: 'Mensuel · bénéfice · détails',
+          route: '/stats',
+        },
+        {
+          icon: 'clock.arrow.circlepath',
+          label: 'Historique',
+          value: 'Tous les versements et frais',
           route: '/historique',
         },
         {
@@ -80,11 +98,26 @@ export default function PlusScreen() {
       ],
     },
     {
+      section: 'Export Excel',
+      items: [
+        {
+          icon: 'square.and.arrow.up',
+          label: 'Exporter versements',
+          value: 'Fichier CSV ouvrable dans Excel',
+          action: 'export_versements',
+        },
+        {
+          icon: 'square.and.arrow.up',
+          label: 'Exporter frais',
+          value: 'Fichier CSV ouvrable dans Excel',
+          action: 'export_frais',
+        },
+      ],
+    },
+    {
       section: 'Application',
       items: [
-        { icon: 'paintbrush', label: 'Apparence', value: 'Système' },
-        { icon: 'questionmark.circle', label: 'Aide & support' },
-        { icon: 'info.circle', label: 'À propos' },
+        { icon: 'info.circle', label: 'À propos', value: 'Bajaj Manager v1.0' },
       ],
     },
   ];
@@ -93,40 +126,48 @@ export default function PlusScreen() {
     <View style={styles.container}>
       <StatusBar barStyle="light-content" />
       <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <Text style={styles.headerTitle}>Paramètres</Text>
+        <Text style={styles.headerTitle}>Plus</Text>
+        <Text style={styles.headerSub}>{ownerName}</Text>
       </View>
 
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
+        {exporting && (
+          <View style={styles.exportBanner}>
+            <ActivityIndicator color={Colors.light.primary} />
+            <Text style={styles.exportText}>Export en cours…</Text>
+          </View>
+        )}
+
         {menu.map((section, si) => (
           <View key={si} style={styles.section}>
-            {section.section ? (
-              <Text style={styles.sectionTitle}>{section.section}</Text>
-            ) : null}
-            <View style={styles.card}>
-              {section.items.map((item, i) => (
-                <TouchableOpacity
-                  key={i}
-                  style={[styles.row, i < section.items.length - 1 && styles.rowBorder]}
-                  onPress={() => item.route && router.push(item.route as any)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles.iconWrap}>
-                    <IconSymbol name={item.icon} size={20} color={Colors.light.primary} />
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.rowLabel}>{item.label}</Text>
-                    {item.value ? (
-                      <Text style={styles.rowValue}>{item.value}</Text>
-                    ) : null}
-                  </View>
-                  <IconSymbol name="chevron.right" size={18} color={Colors.light.textMuted} />
-                </TouchableOpacity>
-              ))}
-            </View>
+            <Text style={styles.sectionTitle}>{section.section}</Text>
+            {section.items.map((item: any, ii: number) => (
+              <TouchableOpacity
+                key={ii}
+                style={styles.menuItem}
+                activeOpacity={0.7}
+                onPress={() => {
+                  if (item.route) router.push(item.route as any);
+                  else if (item.action === 'export_versements') handleExportVersements();
+                  else if (item.action === 'export_frais') handleExportFrais();
+                }}
+              >
+                <View style={styles.menuIcon}>
+                  <IconSymbol name={item.icon as any} size={20} color={Colors.light.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.menuLabel}>{item.label}</Text>
+                  {item.value ? (
+                    <Text style={styles.menuValue}>{item.value}</Text>
+                  ) : null}
+                </View>
+                <IconSymbol name="chevron.right" size={16} color={Colors.light.textMuted} />
+              </TouchableOpacity>
+            ))}
           </View>
         ))}
 
-        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+        <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout} activeOpacity={0.8}>
           <IconSymbol
             name="rectangle.portrait.and.arrow.right"
             size={20}
@@ -143,60 +184,63 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
   header: {
     backgroundColor: Colors.light.header,
-    paddingHorizontal: 16,
-    paddingBottom: 16,
+    paddingHorizontal: 20,
+    paddingBottom: 20,
   },
-  headerTitle: {
-    color: '#fff',
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
+  headerTitle: { color: '#F5C400', fontSize: 20, fontWeight: '800', letterSpacing: 0.3 },
+  headerSub: { color: 'rgba(255,255,255,0.8)', fontSize: 13, marginTop: 2 },
+  exportBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    margin: 16,
+    padding: 12,
+    backgroundColor: '#FFF8E1',
+    borderRadius: Radius.md,
   },
+  exportText: { fontSize: 14, color: Colors.light.primary, fontWeight: '600' },
   section: { marginTop: 20, paddingHorizontal: 16 },
   sectionTitle: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.light.textSecondary,
+    color: Colors.light.textMuted,
     marginBottom: 8,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.5,
   },
-  card: {
-    backgroundColor: Colors.light.card,
-    borderRadius: Radius.lg,
-    overflow: 'hidden',
-  },
-  row: {
+  menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
+    backgroundColor: Colors.light.card,
+    borderRadius: Radius.md,
+    padding: 14,
+    marginBottom: 8,
     gap: 12,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
-  rowBorder: {
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  iconWrap: {
+  menuIcon: {
     width: 36,
     height: 36,
     borderRadius: 10,
-    backgroundColor: '#DBEAFE',
+    backgroundColor: '#FFF8E1',
     alignItems: 'center',
     justifyContent: 'center',
   },
-  rowLabel: { fontSize: 15, fontWeight: '500', color: Colors.light.text },
-  rowValue: { fontSize: 13, color: Colors.light.textSecondary, marginTop: 2 },
+  menuLabel: { fontSize: 15, fontWeight: '600', color: Colors.light.text },
+  menuValue: { fontSize: 12, color: Colors.light.textMuted, marginTop: 2 },
   logoutBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
+    marginTop: 32,
     marginHorizontal: 16,
-    marginTop: 28,
     paddingVertical: 14,
-    backgroundColor: '#FEE2E2',
     borderRadius: Radius.md,
+    backgroundColor: '#FEF2F2',
+    borderWidth: 1,
+    borderColor: '#FECACA',
   },
-  logoutText: { fontSize: 16, fontWeight: '600', color: Colors.light.danger },
+  logoutText: { fontSize: 15, fontWeight: '600', color: Colors.light.danger },
 });

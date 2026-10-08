@@ -5,162 +5,124 @@ import {
   StyleSheet,
   FlatList,
   ActivityIndicator,
-  Alert,
-  Platform,
+  RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from 'expo-router';
-import * as FileSystem from 'expo-file-system/legacy';
 import { Colors, Radius } from '@/constants/theme';
-import { getSeasonHistory, historyToCsv, type HistoryRow } from '@/lib/api';
-import { Header } from '@/components/volley/Header';
-import { PrimaryButton } from '@/components/volley/PrimaryButton';
-import { EmptyState } from '@/components/volley/EmptyState';
-import { StatusBadge } from '@/components/volley/StatusBadge';
+import { getVersements, getFrais, getBajajs } from '@/lib/api';
+import type { Versement, Frais, Bajaj } from '@/lib/types';
+import { Header } from '@/components/common/Header';
+import { EmptyState } from '@/components/common/EmptyState';
 
-/**
- * Télécharge / enregistre le CSV localement (pas de partage ni d'envoi).
- * - Android : dossier choisi via le gestionnaire de fichiers (Téléchargements, etc.)
- * - iOS / autres : dossier Documents de l'application
- */
-async function downloadCsv(csv: string, filename: string): Promise<string> {
-  // Android : laisser l'utilisateur choisir où enregistrer (ex. Téléchargements)
-  if (Platform.OS === 'android' && FileSystem.StorageAccessFramework) {
-    const permissions = await FileSystem.StorageAccessFramework.requestDirectoryPermissionsAsync();
-    if (permissions.granted) {
-      const uri = await FileSystem.StorageAccessFramework.createFileAsync(
-        permissions.directoryUri,
-        filename,
-        'text/csv'
-      );
-      await FileSystem.writeAsStringAsync(uri, csv, {
-        encoding: FileSystem.EncodingType.UTF8,
-      });
-      return uri;
-    }
-    // Permission refusée → fallback Documents app
-  }
-
-  const base =
-    FileSystem.documentDirectory || FileSystem.cacheDirectory || '';
-  const path = `${base}${filename}`;
-  await FileSystem.writeAsStringAsync(path, csv, {
-    encoding: FileSystem.EncodingType.UTF8,
-  });
-  return path;
-}
+type Item =
+  | { kind: 'versement'; data: Versement }
+  | { kind: 'frais'; data: Frais };
 
 export default function HistoriqueScreen() {
-  const [rows, setRows] = useState<HistoryRow[]>([]);
+  const [items, setItems] = useState<Item[]>([]);
+  const [bajajs, setBajajs] = useState<Bajaj[]>([]);
   const [loading, setLoading] = useState(true);
-  const [exporting, setExporting] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  const load = async () => {
+    const [v, f, b] = await Promise.all([getVersements(), getFrais(), getBajajs()]);
+    setBajajs(b);
+    const combined: Item[] = [
+      ...v.map((x) => ({ kind: 'versement' as const, data: x })),
+      ...f.map((x) => ({ kind: 'frais' as const, data: x })),
+    ];
+    combined.sort((a, b) => {
+      const da = a.data.date + (a.kind === 'versement' ? a.data.heure : a.data.heure);
+      const db = b.data.date + (b.kind === 'versement' ? b.data.heure : b.data.heure);
+      return db.localeCompare(da);
+    });
+    setItems(combined);
+    setLoading(false);
+    setRefreshing(false);
+  };
 
   useFocusEffect(
     useCallback(() => {
-      (async () => {
-        const data = await getSeasonHistory();
-        setRows(data);
-        setLoading(false);
-      })();
+      load();
     }, [])
   );
 
-  const exportExcel = async () => {
-    if (rows.length === 0) {
-      Alert.alert('Export', 'Aucune donnée à exporter');
-      return;
-    }
-    setExporting(true);
-    try {
-      const csv = historyToCsv(rows);
-      const filename = `historique_presences_${new Date().toISOString().slice(0, 10)}.csv`;
-      const savedPath = await downloadCsv(csv, filename);
+  const getMatricule = (id: string) => bajajs.find((x) => x.id === id)?.matricule ?? '—';
 
-      Alert.alert(
-        'Téléchargement terminé',
-        Platform.OS === 'android'
-          ? `Fichier enregistré :\n${filename}\n\nOuvrez-le avec Excel ou Google Sheets.`
-          : `Fichier enregistré dans l'application :\n${filename}`,
-        [{ text: 'OK' }]
+  const renderItem = ({ item }: { item: Item }) => {
+    if (item.kind === 'versement') {
+      const v = item.data;
+      return (
+        <View style={styles.card}>
+          <View style={styles.row}>
+            <Text style={styles.type}>💰 Versement</Text>
+            <Text style={styles.date}>{v.date}</Text>
+          </View>
+          <Text style={styles.main}>
+            {getMatricule(v.bajaj_id)} · {v.montant_recu.toLocaleString('fr-FR')} Ar
+          </Text>
+        </View>
       );
-    } catch (e) {
-      Alert.alert('Erreur export', String(e));
-    } finally {
-      setExporting(false);
     }
-  };
-
-  if (loading) {
+    const f = item.data;
     return (
-      <View style={[styles.container, styles.center]}>
-        <ActivityIndicator size="large" color={Colors.light.primary} />
+      <View style={styles.card}>
+        <View style={styles.row}>
+          <Text style={styles.type}>🔧 {f.type}</Text>
+          <Text style={styles.date}>{f.date}</Text>
+        </View>
+        <Text style={styles.main}>
+          {getMatricule(f.bajaj_id)} · {f.montant.toLocaleString('fr-FR')} Ar
+        </Text>
+        {f.piece ? <Text style={styles.sub}>{f.piece}</Text> : null}
       </View>
     );
-  }
+  };
 
   return (
     <View style={styles.container}>
-      <Header title="Historique des présences" showBack />
-      <View style={styles.toolbar}>
-        <Text style={styles.count}>
-          {rows.length} ligne{rows.length !== 1 ? 's' : ''}
-        </Text>
-        <PrimaryButton
-          title={exporting ? 'Téléchargement…' : 'Télécharger Excel (CSV)'}
-          icon="arrow.down.circle"
-          onPress={exportExcel}
-          disabled={exporting || rows.length === 0}
-          style={{ paddingVertical: 10, paddingHorizontal: 14 }}
+      <Header title="Historique" showBack />
+      {loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator size="large" color={Colors.light.primary} />
+        </View>
+      ) : (
+        <FlatList
+          data={items}
+          keyExtractor={(item, i) => item.kind + item.data.id + i}
+          renderItem={renderItem}
+          contentContainerStyle={{ padding: 16, paddingBottom: 40 }}
+          ListEmptyComponent={<EmptyState message="Aucun historique" />}
+          refreshControl={
+            <RefreshControl
+              refreshing={refreshing}
+              onRefresh={() => {
+                setRefreshing(true);
+                load();
+              }}
+              tintColor={Colors.light.primary}
+            />
+          }
         />
-      </View>
-      <FlatList
-        data={rows}
-        keyExtractor={(item, i) => `${item.training_id}-${item.member_id}-${i}`}
-        contentContainerStyle={{ padding: 12, flexGrow: 1, paddingBottom: 40 }}
-        ListEmptyComponent={
-          <EmptyState message="Aucune donnée enregistrée" icon="chart.bar.fill" />
-        }
-        renderItem={({ item }) => (
-          <View style={styles.row}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.name}>
-                {item.first_name} {item.last_name} · #{item.number}
-              </Text>
-              <Text style={styles.meta}>
-                {item.date} · {item.start_time}–{item.end_time}
-                {item.location ? ` · ${item.location}` : ''}
-              </Text>
-            </View>
-            <StatusBadge status={item.status as any} />
-          </View>
-        )}
-      />
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.light.background },
-  center: { alignItems: 'center', justifyContent: 'center' },
-  toolbar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: Colors.light.card,
-    borderBottomWidth: 1,
-    borderBottomColor: Colors.light.border,
-  },
-  count: { fontSize: 13, color: Colors.light.textSecondary, fontWeight: '600' },
-  row: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  center: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  card: {
     backgroundColor: Colors.light.card,
     borderRadius: Radius.md,
-    padding: 12,
+    padding: 14,
     marginBottom: 8,
-    gap: 10,
+    borderWidth: 1,
+    borderColor: Colors.light.border,
   },
-  name: { fontSize: 14, fontWeight: '600', color: Colors.light.text },
-  meta: { fontSize: 12, color: Colors.light.textSecondary, marginTop: 2 },
+  row: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 },
+  type: { fontSize: 12, fontWeight: '600', color: Colors.light.primary },
+  date: { fontSize: 12, color: Colors.light.textMuted },
+  main: { fontSize: 15, fontWeight: '600', color: Colors.light.text },
+  sub: { fontSize: 13, color: Colors.light.textSecondary, marginTop: 2 },
 });

@@ -8,9 +8,8 @@ import { Colors } from '@/constants/theme';
 
 export default function TabLayout() {
   const insets = useSafeAreaInsets();
-  // Hauteur de la barre système (boutons Android / home indicator iOS)
   const bottomInset = Math.max(insets.bottom, Platform.OS === 'android' ? 12 : 0);
-  const tabBarHeight = 56 + bottomInset;
+  const tabBarHeight = 60 + bottomInset;
 
   return (
     <Tabs
@@ -20,24 +19,23 @@ export default function TabLayout() {
         headerShown: false,
         tabBarButton: HapticTab,
         tabBarStyle: {
-          backgroundColor: '#fff',
-          borderTopColor: Colors.light.border,
-          borderTopWidth: 1,
+          backgroundColor: '#1A1A1A',
+          borderTopColor: Colors.light.primary,
+          borderTopWidth: 2,
           height: tabBarHeight,
           paddingBottom: bottomInset,
-          paddingTop: 6,
+          paddingTop: 8,
           position: 'absolute',
           left: 0,
           right: 0,
           bottom: 0,
-          elevation: 8,
+          elevation: 12,
         },
         tabBarLabelStyle: {
           fontSize: 11,
-          fontWeight: '500',
+          fontWeight: '600',
           marginBottom: Platform.OS === 'android' ? 4 : 0,
         },
-        // Espace pour que le contenu ne passe pas sous la tab bar
         sceneStyle: {
           paddingBottom: tabBarHeight,
         },
@@ -51,24 +49,28 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="equipe"
+        name="bajaj"
         options={{
-          title: 'Équipe',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="person.2.fill" color={color} />,
+          title: 'Bajaj',
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="car.fill" color={color} />,
         }}
       />
       <Tabs.Screen
-        name="entrainements"
+        name="chauffeurs"
         options={{
-          title: 'Entraînements',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="calendar" color={color} />,
+          title: 'Chauffeurs',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={24} name="person.2.fill" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="presences"
+        name="versements"
         options={{
-          title: 'Présences',
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="checkmark.circle.fill" color={color} />,
+          title: 'Versements',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={24} name="banknote.fill" color={color} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -78,7 +80,6 @@ export default function TabLayout() {
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="ellipsis" color={color} />,
         }}
       />
-      <Tabs.Screen name="explore" options={{ href: null }} />
     </Tabs>
   );
 }
