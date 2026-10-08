@@ -29,3 +29,4 @@ npx expo start
 - Téléphone : `0340000000`
 - Mot de passe : `bajaj2026`
 # bajaj_manager
+# bajaj_manager
